@@ -17,7 +17,7 @@ use hypervisor::{
     },
     BlockConfig, Hypervisor, VfioConfig,
 };
-use kata_types::config::{hypervisor::TopologyConfigInfo, TomlConfig};
+use kata_types::config::{hypervisor::{ProtectionDeviceInfo, TopologyConfigInfo}, TomlConfig};
 use kata_types::mount::Mount;
 use oci::{Linux, LinuxCpu, LinuxResources};
 use oci_spec::runtime::{self as oci, LinuxDeviceType};
@@ -146,6 +146,17 @@ impl ResourceManagerInner {
                         .await
                         .context("do handle vsock device failed.")?;
                 }
+                ResourceConfig::ProtectionDev(p) => {
+                    let protection_device_config = self.handle_protection_device(p)
+                        .await
+                        .context("failed to handle protection device")?;
+
+                    if Some(protection_device_config) = protection_device_config {
+                        do_handle_device(&self.device_manager, &DeviceConfig::ProtectionDevice(protection_device_config))
+                            .await
+                            .context("do handle protection device failed.")?;
+                    }
+                }
             };
         }
 
@@ -181,6 +192,25 @@ impl ResourceManagerInner {
         .context("failed to set up network")?;
         self.network = Some(network);
         Ok(())
+    }
+
+    pub async fn handle_protection_device(&self, protection_dev_config: &ProtectionDeviceInfo) -> Option<ProtectionDeviceConfig> {
+        // Use protection device config and checks on the host machine to
+        // - figure out which protection to use
+        // - collect any information necessary to configure it and
+        // - run any linux-side (kernel etc.) setup.
+        // Protection device doesn't seem to need to be stored in 'self' (like
+        // self.network or self.share_fs) unless it turns out it needs some
+        // kind of post-vm-launch additional setup.
+        //
+        // if user_wants_snp_and_its_available {
+        //     ...
+        //     return Some(ProtectionDeviceConfig::SnpConfig::new(...));
+        // } else if tdx {
+        //     ...
+        //     return Some(ProtectionDeviceConfig::TdxConfig::new(...));
+        // }
+        None
     }
 
     async fn handle_interfaces(&self, network: &dyn Network) -> Result<()> {
@@ -456,6 +486,7 @@ impl ResourceManagerInner {
     ) -> Result<Option<LinuxResources>> {
         let linux_cpus = || -> Option<&LinuxCpu> { linux_resources.as_ref()?.cpu().as_ref() }();
 
+        info!(sl!(), "ResouceManagerInner::update_linux_resources(): linux_resources: {:?}, linux_cpus: {:?}", linux_resources.ok_or(anyhow!("totok"))?, linux_cpus.ok_or(anyhow!("kokot"))?);
         // if static_sandbox_resource_mgmt, we will not have to update sandbox's cpu or mem resource
         if !self.toml_config.runtime.static_sandbox_resource_mgmt {
             // update cpu

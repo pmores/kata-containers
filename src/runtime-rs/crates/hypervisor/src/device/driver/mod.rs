@@ -12,6 +12,7 @@ mod virtio_blk;
 mod virtio_fs;
 mod virtio_net;
 mod virtio_vsock;
+pub mod protection_device;
 
 pub use vfio::{
     bind_device_to_host, bind_device_to_vfio, get_vfio_device, HostDevice, VfioBusMode, VfioConfig,

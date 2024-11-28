@@ -27,6 +27,7 @@ use hypervisor::{utils::get_hvsock_path, HybridVsockConfig, DEFAULT_GUEST_VSOCK_
 use hypervisor::{BlockConfig, Hypervisor};
 use kata_sys_util::hooks::HookStates;
 use kata_types::capabilities::CapabilityBits;
+use kata_types::config::hypervisor::ProtectionDeviceInfo;
 #[cfg(not(target_arch = "s390x"))]
 use kata_types::config::hypervisor::HYPERVISOR_NAME_CH;
 use kata_types::config::TomlConfig;
@@ -149,6 +150,15 @@ impl VirtSandbox {
         {
             let vm_rootfs = ResourceConfig::VmRootfs(block_config);
             resource_configs.push(vm_rootfs);
+        }
+
+        // prepare protection device config
+        if let Some(protection_dev_config) = self
+            .prepare_protection_device_config()
+            .await
+            .context("failed to prepare protection device config")?
+        {
+            resource_configs.push(ResourceConfig::ProtectionDev(protection_dev_config));
         }
 
         Ok(resource_configs)
@@ -295,6 +305,16 @@ impl VirtSandbox {
         };
 
         Ok(vm_socket)
+    }
+
+    async fn prepare_protection_device_config(&self) -> Result<Option<ProtectionDeviceInfo>> {
+        let protection_dev_info = self.hypervisor.hypervisor_config().await.protection_dev_info;
+
+        // - check if protection is even turned on, if not return Ok(None)
+        // - check available protection types
+        // ...
+
+        Ok(Some(protection_dev_info))
     }
 
     fn has_prestart_hooks(

@@ -1056,6 +1056,12 @@ pub struct RemoteInfo {
     pub hypervisor_timeout: i32,
 }
 
+/// Configuration information for TEEs.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ProtectionDeviceInfo {
+    // TEE-related settings from the config file
+}
+
 /// Common configuration information for hypervisors.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Hypervisor {
@@ -1157,6 +1163,10 @@ pub struct Hypervisor {
     /// Disable applying SELinux on the container process.
     #[serde(default = "yes")]
     pub disable_guest_selinux: bool,
+
+    /// Remote hypervisor configuration information.
+    #[serde(default, flatten)]
+    pub protection_dev_info: ProtectionDeviceInfo,
 }
 
 fn yes() -> bool {

@@ -26,7 +26,7 @@ pub use manager::ResourceManager;
 pub mod cdi_devices;
 pub mod cpu_mem;
 
-use kata_types::config::hypervisor::SharedFsInfo;
+use kata_types::config::hypervisor::{ProtectionDeviceInfo, SharedFsInfo};
 
 #[derive(Debug)]
 pub enum ResourceConfig {
@@ -35,6 +35,7 @@ pub enum ResourceConfig {
     VmRootfs(BlockConfig),
     HybridVsock(HybridVsockConfig),
     Vsock(VsockConfig),
+    ProtectionDev(ProtectionDeviceInfo)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

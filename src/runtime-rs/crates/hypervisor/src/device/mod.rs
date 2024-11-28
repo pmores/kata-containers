@@ -12,6 +12,7 @@ use crate::{
     NetworkConfig, NetworkDevice, ShareFsConfig, ShareFsDevice, VfioConfig, VfioDevice,
     VhostUserConfig, VhostUserNetDevice, VsockConfig, VsockDevice,
 };
+use driver::protection_device::{ProtectionDevice, ProtectionDeviceConfig};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -35,6 +36,7 @@ pub enum DeviceConfig {
     VfioCfg(VfioConfig),
     VsockCfg(VsockConfig),
     HybridVsockCfg(HybridVsockConfig),
+    ProtectionDeviceCfg(ProtectionDeviceConfig),
 }
 
 #[derive(Debug, Clone)]
@@ -47,6 +49,7 @@ pub enum DeviceType {
     ShareFs(ShareFsDevice),
     HybridVsock(HybridVsockDevice),
     Vsock(VsockDevice),
+    ProtectionDevice(ProtectionDevice),
 }
 
 impl fmt::Display for DeviceType {

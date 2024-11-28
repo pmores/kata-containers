@@ -24,6 +24,8 @@ use super::{
     Device, DeviceConfig, DeviceType,
 };
 
+use protection_device::ProtectionDeviceConfig;
+
 pub type ArcMutexDevice = Arc<Mutex<dyn Device>>;
 
 macro_rules! declare_index {
@@ -385,6 +387,10 @@ impl DeviceManager {
                 }
 
                 Arc::new(Mutex::new(ShareFsDevice::new(&device_id, config)))
+            }
+            DeviceConfig::ProtectionDeviceCfg(protection_device_cfg) => {
+                // Do we need to find device for protection device?
+                Arc::new(Mutex::new(ProtectionDevice::new(&device_id, protection_device_cfg)))
             }
         };
 

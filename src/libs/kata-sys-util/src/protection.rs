@@ -105,6 +105,8 @@ pub fn available_guest_protection() -> Result<GuestProtection, ProtectionError> 
     )
 }
 
+// Fill in other TEE implementations here...
+
 #[cfg(target_arch = "x86_64")]
 pub fn arch_guest_protection(
     tdx_path: &str,
