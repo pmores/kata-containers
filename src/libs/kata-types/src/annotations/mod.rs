@@ -803,7 +803,19 @@ impl Annotation {
                     // Hypervisor Memory related annotations
                     KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY => {
                         match byte_unit::Byte::parse_str(value, true) {
-                            Ok(mem_bytes) => {
+                            Ok(mut mem_bytes) => {
+                                let no_suffix_given =
+                                    value.trim().chars().all(|c: char| c.is_ascii_digit());
+                                if no_suffix_given {
+                                    mem_bytes = byte_unit::Byte::from_u64_with_unit(
+                                        mem_bytes.as_u64(),
+                                        byte_unit::Unit::MiB,
+                                    )
+                                    .ok_or(io::Error::new(
+                                        io::ErrorKind::InvalidData,
+                                        format!("failed to convert {} to MiB", mem_bytes.as_u64()),
+                                    ))?;
+                                }
                                 let memory_size = mem_bytes
                                     .get_adjusted_unit(byte_unit::Unit::MiB)
                                     .get_value()
@@ -1216,5 +1228,90 @@ impl Annotation {
         config.adjust_config()?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Make a bare minimum config to enable testing the default_memory annotaion
+    // processing in update_config_by_annotation().  Note the even this will
+    // not make the function run properly as that would require a fully set-up
+    // config that can pass adjust_config().
+    fn make_config() -> TomlConfig {
+        let mut config = TomlConfig {
+            ..Default::default()
+        };
+        config.runtime.name = "kata".to_owned();
+        config.runtime.agent_name = "kata".to_owned();
+        config.runtime.hypervisor_name = "qemu".to_owned();
+        config
+            .hypervisor
+            .insert("qemu".to_owned(), crate::config::Hypervisor::default());
+        config
+            .agent
+            .insert("kata".to_owned(), crate::config::Agent::default());
+
+        let hv = config.hypervisor.get_mut("qemu").unwrap();
+        // just any recognizable value
+        hv.memory_info.default_memory = 678;
+        hv.security_info.enable_annotations = vec![KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY
+            .strip_prefix(KATA_ANNO_CFG_HYPERVISOR_PREFIX)
+            .unwrap()
+            .to_owned()];
+        // This is necessary to make `config` pass adjust_config().  A file
+        // that exists on filesystem is required. An empty string won't do as
+        // adjust_config() would substite a default value which is unlikely
+        // to be found on the filesystem.
+        hv.boot_info.kernel = "/dev/null".to_owned();
+        hv.boot_info.image = "/dev/null".to_owned();
+        hv.boot_info.initrd = "/dev/null".to_owned();
+        hv.boot_info.firmware = "/dev/null".to_owned();
+
+        let qemu_config = std::sync::Arc::new(crate::config::QemuConfig::new());
+        crate::config::hypervisor::register_hypervisor_plugin("qemu", qemu_config);
+
+        config
+    }
+
+    #[test]
+    fn default_memory_no_unit() {
+        let annotations = Annotation::from(HashMap::from([(
+            KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY.to_owned(),
+            "2048".to_string(),
+        )]));
+        let mut config = make_config();
+        let result = annotations.update_config_by_annotation(&mut config);
+        assert!(result.is_ok());
+        let hv = config.hypervisor.get_mut("qemu").unwrap();
+        assert_eq!(hv.memory_info.default_memory, 2048);
+    }
+
+    #[test]
+    fn default_memory_with_units() {
+        let annotations = Annotation::from(HashMap::from([(
+            KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY.to_owned(),
+            "2 GiB".to_string(),
+        )]));
+        let mut config = make_config();
+        let result = annotations.update_config_by_annotation(&mut config);
+        assert!(result.is_ok());
+        let hv = config.hypervisor.get_mut("qemu").unwrap();
+        assert_eq!(hv.memory_info.default_memory, 2048);
+    }
+
+    #[test]
+    fn default_memory_too_small() {
+        let annotations = Annotation::from(HashMap::from([(
+            KATA_ANNO_CFG_HYPERVISOR_DEFAULT_MEMORY.to_owned(),
+            "32MiB".to_string(),
+        )]));
+        let mut config = make_config();
+        let result = annotations.update_config_by_annotation(&mut config);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::InvalidData);
+        let hv = config.hypervisor.get_mut("qemu").unwrap();
+        assert_eq!(hv.memory_info.default_memory, 678);
     }
 }
